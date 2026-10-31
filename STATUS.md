@@ -40,6 +40,11 @@ and Ori-style vertical movement).
 - Controls: big on-screen ◀ ▶ buttons on the left and a jump button on the
   right. The whole left half of the screen counts as move and the right half
   as jump. On PC: arrow keys / WASD, plus space to jump.
+- Game controller (Xbox etc., via the browser's Gamepad API, added
+  2026-10-31): left stick or D-pad moves, and A/B/X/Y all jump. A also
+  presses Play, picks the highlighted animal card and presses the highlighted
+  win-screen button. Chrome may not unlock sound from a controller press
+  alone, so if it's silent, click Play with the mouse.
 - Code-drawn graphics and synthesized sound, one `index.html`. A headless
   smoke test plus a bot run reached the win screen at phone and PC sizes.
 
