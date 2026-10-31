@@ -39,10 +39,11 @@ is genuinely missing.
   --bind 0.0.0.0` and send the LAN-IP link (see the global file). Works only
   on home Wi-Fi while the PC is on. Service workers don't register over
   plain-http LAN, so offline/install only works once it's hosted on https.
-- Repo: `github.com/DDMrt/kid-games` (private). Pushing still needs Dillon's
-  yes every time.
-- Permanent hosting: not set up yet. GitHub Pages needs a public repo on the
-  free plan, so it would mean changing visibility or picking another https
-  host. Dillon decides.
+- Repo: `github.com/DDMrt/kid-games` (**public**, so never commit anything
+  private, such as his name or photos). Pushing still needs Dillon's yes
+  every time.
+- Hosting: GitHub Pages from `main` at `https://ddmrt.github.io/kid-games/`.
+  Every push goes live. Bump `CACHE` in a game's `sw.js` whenever its files
+  change, or installed home-screen copies keep the old version.
 - For locking him inside the game: Guided Access on iPhone; screen pinning or
   a child profile on the Fire tablet.
