@@ -1,6 +1,6 @@
 # games — Status
 
-**Last updated:** 2026-10-31
+**Last updated:** 2026-11-01
 
 ## Where things stand
 
@@ -20,7 +20,7 @@
 
 ## Games
 
-### forest_friends (first build 2026-10-31; runs on Dillon's iPhone from the Pages link)
+### forest_friends (first build 2026-10-31; play-tested and installed to Dillon's iPhone home screen as of 2026-11-01)
 
 Dillon's design: a side-scrolling platformer (a mix of Mario-style running
 and Ori-style vertical movement).
@@ -80,9 +80,7 @@ and Ori-style vertical movement).
 
 ## Next steps
 
-1. Play-test `forest_friends` on iPhone, Fire tablet and PC over the LAN link
-   (`python -m http.server 8080 --bind 0.0.0.0` in the game folder). Tune
-   speed, jump height, button size and difficulty from how he actually plays.
-2. Install on the iPhone: open the Pages link in Safari, tap Share, then Add
-   to Home Screen, then open it once while online. When changing a game,
-   bump `CACHE` in its `sw.js` so installed copies pick up the new version.
+1. Play-test on the Fire tablet and PC if not done yet. Tune speed, jump
+   height, button size and difficulty from how he actually plays.
+2. When changing a game, bump `CACHE` in its `sw.js` so the installed iPhone
+   copy picks up the new version (open it once while online).
