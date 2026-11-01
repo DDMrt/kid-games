@@ -20,36 +20,54 @@
 
 ## Games
 
-### forest_friends (first build 2026-10-31, not yet play-tested on devices)
+### forest_friends (first build 2026-10-31; runs on Dillon's iPhone from the Pages link)
 
 Dillon's design: a side-scrolling platformer (a mix of Mario-style running
 and Ori-style vertical movement).
 
 - Pick one of 4 animals: squirrel, puppy, raccoon, bird. They look different
   but all move the same: walk, jump, a double jump (flutter) in the air, and
-  holding jump makes them float down slowly.
+  holding jump makes them float down slowly. Down on a branch or ledge drops
+  through it; down on the ground is a little crouch.
 - Level 1 is a magical forest. Tree branches are one-way platforms. There
   are butterflies, falling leaves, swaying flowers, glowing mushrooms and
   floating sparkles.
-- Enemies are goofy purple beetles and hopping green slimes. Landing on one
-  pops it into stars. Running into one from the side gives a gentle "boing"
-  bounce back. There are no lives and no restarts.
-- The key sits high in the 5th tree, about 55% of the way through. The gate
-  at the end stays shut without the key: the animal shows a "key" thought
-  bubble and the key slot in the top-left pulses. With the key, the key
-  flies into the lock, the doors open and a rainbow appears.
+- Enemies are goofy purple beetles and hopping **lilac** slimes (changed from
+  green, which blended into the forest). Landing on one gives a big pop with
+  stars, rings and upward-drifting fairy sparkles. Running into one from the
+  side gives a gentle "boing" bounce back. There are no lives and no
+  restarts.
+- 5 acorns sit on branches (`ACORN_POS`). A counter like "2/5" sits next to
+  the key slot. Each acorn makes a big number pop and bounce in the middle
+  of the screen, with its own sound for 1 to 4. The 5th gets a rainbow 5,
+  confetti and a cheering crowd.
+- Portals use up (▲). The **key is hidden in a secret cave**: the cave mouth
+  is a mossy rock mound on the forest floor at `CAVE_X` (between the 5th and
+  6th trees). ▲ there goes inside, with a circle-wipe transition. The cave is
+  a crystal room with two rock ledges and the key above the high one, plus a
+  daylight exit on the left. ▲ at the exit returns to the cave mouth. A
+  bouncing ▲ bubble appears whenever a portal is usable, and the ▲ button
+  glows. ▲ works mid-jump and is remembered for about 0.35s.
+- The gate at the end stays shut without the key: the animal shows a "key"
+  thought bubble and the key slot pulses. With the key, the key flies into
+  the lock and the doors open. Then **▲ goes through** with a golden
+  wipe, a rainbow and the win screen.
 - Win screen: confetti, then two buttons: replay (green arrow) and choose
   animal (orange paw).
-- Controls: big on-screen ◀ ▶ buttons on the left and a jump button on the
-  right. The whole left half of the screen counts as move and the right half
-  as jump. On PC: arrow keys / WASD, plus space to jump.
-- Game controller (Xbox etc., via the browser's Gamepad API, added
-  2026-10-31): left stick or D-pad moves, and A/B/X/Y all jump. A also
-  presses Play, picks the highlighted animal card and presses the highlighted
-  win-screen button. Chrome may not unlock sound from a controller press
-  alone, so if it's silent, click Play with the mouse.
-- Code-drawn graphics and synthesized sound, one `index.html`. A headless
-  smoke test plus a bot run reached the win screen at phone and PC sizes.
+- Touch controls: a ▲▼◀▶ cross on the left, and the jump button on the right
+  (drawn as a gold star so it doesn't look like ▲). The whole left half of
+  the screen picks the cross direction nearest the finger, and the right half
+  is jump. PC keyboard: arrows / WASD, and **space to jump** (up no longer
+  jumps; it's the portal key).
+- Game controller (Xbox etc., via the browser's Gamepad API): left stick or
+  D-pad moves, up/down for portals and drop-through, and A/B/X/Y all jump. A
+  also presses Play, picks the highlighted animal card and presses the
+  highlighted win-screen button. Chrome may not unlock sound from a
+  controller press alone, so if it's silent, click Play with the mouse.
+- Code-drawn graphics and synthesized sound, one `index.html`. Headless bot
+  runs (enter the cave, get the key, exit, unlock the gate, ▲ through it, plus
+  drop-through and all 5 acorns) reach the win screen at phone-landscape,
+  phone-portrait and PC sizes.
 
 ## Next steps
 

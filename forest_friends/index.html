@@ -54,7 +54,7 @@
   const WALK = 300, GRAV = 2300, JUMP_V = 920, DJUMP_V = 820, GLIDE = 210;
 
   let W = 0, H = 0, S = 0, dpr = 1, sc = 1, offY = 0, viewW = 0, viewTop = 0;
-  let skyGrad = null, sunGrad = null, BTN = {};
+  let skyGrad = null, sunGrad = null, caveGrad = null, BTN = {};
   let state = 'title', T = 0, camX = 0;
 
   const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -72,14 +72,21 @@
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     sc = Math.min(H / VH, W / 760);
     offY = H - VH * sc; viewW = W / sc; viewTop = -offY / sc;
+    caveGrad = ctx.createLinearGradient(0, 0, 0, H);
+    caveGrad.addColorStop(0, '#1d1538'); caveGrad.addColorStop(1, '#3a2b63');
     skyGrad = ctx.createLinearGradient(0, 0, 0, H);
     skyGrad.addColorStop(0, '#7fd3ff'); skyGrad.addColorStop(0.55, '#c9f1ff'); skyGrad.addColorStop(1, '#fff3cf');
     sunGrad = ctx.createRadialGradient(W * 0.82, H * 0.1, 0, W * 0.82, H * 0.1, S * 0.45);
     sunGrad.addColorStop(0, 'rgba(255,250,215,0.95)'); sunGrad.addColorStop(1, 'rgba(255,250,215,0)');
     const R = clamp(S * 0.11, 34, 72), pad = Math.max(18, R * 0.45);
+    // Left: a + shaped pad (up/down/left/right). Right: jump.
+    const br = R * 0.82, d = R * 1.32, cx = pad + d + br, cy = H - pad - d - br;
     BTN = {
-      left: { x: pad + R, y: H - pad - R, r: R },
-      right: { x: pad + R * 3.4, y: H - pad - R, r: R },
+      pad: { x: cx, y: cy },
+      up: { x: cx, y: cy - d, r: br },
+      down: { x: cx, y: cy + d, r: br },
+      left: { x: cx - d, y: cy, r: br },
+      right: { x: cx + d, y: cy, r: br },
       jump: { x: W - pad - R * 1.3, y: H - pad - R * 1.3, r: R * 1.3 },
     };
     layoutCards();
@@ -101,11 +108,20 @@
   for (const t of TREES) for (const [y, side, len] of t.b) {
     PLATS.push({ y, side, tx: t.x, x1: side > 0 ? t.x + 25 : t.x - 35 - len, x2: side > 0 ? t.x + 35 + len : t.x - 25 });
   }
-  const KEY_POS = { x: 3000, y: 175 };
+  // Secret cave: its mouth sits on the forest floor at CAVE_X; press up there to go in.
+  // Inside is a small room (CAVE_W wide) with the key on a high ledge, and the way out at CAVE_EXIT_X.
+  const CAVE_X = 3120, CAVE_W = 1500, CAVE_EXIT_X = 170;
+  const CAVE_PLATS = [{ x1: 620, x2: 830, y: 470, rock: true }, { x1: 900, x2: 1130, y: 360, rock: true }];
+  const KEY_POS = { x: 1015, y: 300 }; // inside the cave
+  const CRYSTALS = [
+    [330, GY, 1.1, '#7be0ff'], [520, GY, 0.8, '#ff8fd8'], [760, 470, 0.7, '#c8a2ff'], [1200, GY, 1.3, '#7be0ff'],
+    [1350, GY, 0.9, '#ff8fd8'], [1080, 360, 0.6, '#7be0ff'], [430, 140, -0.9, '#c8a2ff'], [880, 120, -1.1, '#7be0ff'],
+    [1280, 150, -0.8, '#ff8fd8'], [640, 110, -0.7, '#7be0ff'],
+  ];
   // [kind, x, minX, maxX, surfaceY]
   const ENEMY_DEFS = [
     ['beetle', 850, 700, 980, GY], ['beetle', 1420, 1260, 1560, GY], ['beetle', 1780, 1700, 1870, 460],
-    ['slime', 2000, 1880, 2120, GY], ['beetle', 2600, 2480, 2700, GY], ['slime', 3300, 3160, 3420, GY],
+    ['slime', 2000, 1880, 2120, GY], ['beetle', 2600, 2480, 2700, GY], ['slime', 3350, 3290, 3440, GY],
     ['slime', 3620, 3550, 3690, 330], ['beetle', 3900, 3760, 4020, GY], ['beetle', 4400, 4280, 4520, GY],
     ['slime', 4850, 4740, 4980, GY],
   ];
@@ -115,6 +131,10 @@
   const SPARK = ['#fff7a8', '#ffffff', '#ffe066', '#c9f7ff'];
   const LEAF_COLORS = ['#7ccf5a', '#f5b942', '#ff8c42', '#a8e05f', '#e9c46a'];
   const BUTTERFLY_COLORS = [['#ff7ab6', '#ffc2de'], ['#ffd23f', '#fff0a8'], ['#6ec6ff', '#c9ecff'], ['#c38bff', '#e7d4ff'], ['#ff9f43', '#ffd8a8']];
+  const FAIRY = ['#ffb3e6', '#d9b8ff', '#b8f0ff', '#ffffff', '#fff3a8'];
+  const SLIME = { body: '#c7a4f5', base: '#9f78dc', light: '#efe3ff', mouth: '#5b3a8f' }; // lilac, so it stands out from the greens
+  // Five acorns, each sitting on a branch: [x, y]
+  const ACORN_POS = [[640, 440], [1200, 300], [2120, 190], [3650, 290], [3970, 300]];
 
   const FLOWERS = [], MUSH = [], MOTES = [];
   for (let i = 0; i * 70 < LEVEL_W; i++) {
@@ -218,6 +238,39 @@
         .forEach(([f, w]) => { tone(f, w, 0.35, 'triangle', 0.28); tone(f / 2, w, 0.35, 'sine', 0.12); });
     },
     hop() { tone(700, 0, 0.15, 'sine', 0.18, 1100); },
+    drop() { tone(620, 0, 0.18, 'sine', 0.22, 260); },
+    // A different fun sound for acorns 1-4 (5 gets the cheer).
+    acorn(n) {
+      if (n === 1) { tone(523.25, 0, 0.12, 'square', 0.12); tone(783.99, 0.09, 0.28, 'square', 0.12); }
+      else if (n === 2) { tone(380, 0, 0.4, 'sine', 0.28, 1700); tone(1700, 0.38, 0.15, 'sine', 0.15, 2000); }
+      else if (n === 3) { for (let i = 0; i < 5; i++) tone(500 + i * 180, i * 0.07, 0.09, 'sine', 0.26, 1100 + i * 300); }
+      else { [659.25, 783.99, 1046.5, 1318.5, 1568, 2093].forEach((f, i) => tone(f, i * 0.06, 0.3, 'triangle', 0.2)); }
+    },
+    cheer() {
+      if (!actx) return;
+      const t0 = actx.currentTime;
+      for (let v = 0; v < 7; v++) { // a little crowd going "yaaay"
+        const o = actx.createOscillator(), f = actx.createBiquadFilter(), g = actx.createGain();
+        const l = actx.createOscillator(), lg = actx.createGain();
+        const base = rand(260, 480), st = t0 + rand(0, 0.12);
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(base, st);
+        o.frequency.linearRampToValueAtTime(base * 1.5, st + 0.35);
+        o.frequency.linearRampToValueAtTime(base * 1.3, st + 1.3);
+        l.frequency.value = rand(5, 7); lg.gain.value = base * 0.03; l.connect(lg); lg.connect(o.frequency);
+        f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 1.2;
+        g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(0.07, st + 0.1);
+        g.gain.setValueAtTime(0.07, st + 0.9); g.gain.exponentialRampToValueAtTime(0.0001, st + 1.5);
+        o.connect(f); f.connect(g); g.connect(master);
+        o.start(st); l.start(st); o.stop(st + 1.6); l.stop(st + 1.6);
+      }
+      for (let i = 0; i < 16; i++) noise(0.1 + i * 0.08 + rand(0, 0.04), 0.06, 1500, 0.7, 0.3); // clapping
+      [[523.25, 0], [659.25, 0.12], [783.99, 0.24], [1046.5, 0.4]].forEach(([fr, w]) => tone(fr, w, 0.45, 'triangle', 0.22));
+    },
+    portal() {
+      noise(0, 0.28, 900, 0.6, 0.25, 'lowpass');
+      [783.99, 1046.5, 1318.5, 1568].forEach((f, i) => tone(f, 0.05 + i * 0.06, 0.35, 'sine', 0.16));
+    },
     sparkle() { tone(pick(PENTA) * 2, 0, 0.25, 'sine', 0.12); },
     voice(kind) {
       if (kind === 'squirrel') for (let i = 0; i < 3; i++) tone(1700 + i * 200, i * 0.1, 0.07, 'sine', 0.25, 2600 + i * 200);
@@ -228,16 +281,20 @@
   };
 
   // ---------- Input ----------
-  const pointers = new Map(); // pointerId -> 'left' | 'right' | 'jump'
-  const keys = { left: false, right: false, jump: false };
-  const input = { left: false, right: false, jump: false };
-  let jumpQueued = false;
-  function roleFor(x) {
+  const pointers = new Map(); // pointerId -> 'left' | 'right' | 'up' | 'down' | 'jump'
+  const keys = { left: false, right: false, up: false, down: false, jump: false };
+  const input = { left: false, right: false, up: false, down: false, jump: false };
+  let jumpQueued = false, upQueued = false;
+  // Right half of the screen is jump. Anywhere on the left half picks the cross
+  // direction closest to the finger (measured from the cross's center).
+  function roleFor(x, y) {
     if (x > W * 0.5) return 'jump';
-    return x < (BTN.left.x + BTN.right.x) / 2 ? 'left' : 'right';
+    const dx = x - BTN.pad.x, dy = y - BTN.pad.y;
+    if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? 'left' : 'right';
+    return dy < 0 ? 'up' : 'down';
   }
   function refreshInput() {
-    input.left = keys.left || pad.left; input.right = keys.right || pad.right; input.jump = keys.jump || pad.jump;
+    for (const k of ['left', 'right', 'up', 'down', 'jump']) input[k] = keys[k] || pad[k];
     for (const r of pointers.values()) input[r] = true;
   }
 
@@ -266,7 +323,7 @@
   }
   let padSel = 0, winSel = 0;
   function clearInput() {
-    pointers.clear(); keys.left = keys.right = keys.jump = false; jumpQueued = false; refreshInput();
+    pointers.clear(); for (const k in keys) keys[k] = false; jumpQueued = upQueued = false; refreshInput();
   }
 
   // ---------- Particles ----------
@@ -325,16 +382,56 @@
 
   // ---------- Game state ----------
   let player = null, enemies = [], key = null, gate = null, stompCount = 0, winT = 0, confettiT = 0, hopT = 0;
+  // area: 'forest' (the main level) or 'cave' (the secret room). trans: the circle-wipe between them.
+  let area = 'forest', trans = null, portalHere = null, upBuf = 0;
+  let acorns = [], acornCount = 0, popNum = null;
+  const areaW = () => area === 'cave' ? CAVE_W : LEVEL_W;
+  const areaPlats = () => area === 'cave' ? CAVE_PLATS : PLATS;
 
   function startLevel(kind) {
     player = { kind, x: 150, y: GY, prevY: GY, vx: 0, vy: 0, kb: 0, face: 1, onGround: true, coyote: 0, jumpBuf: 0,
-      extra: true, inv: 0, t: 0, sx: 1, sy: 1, blinkT: 2, blink: false, happy: false };
+      extra: true, inv: 0, t: 0, sx: 1, sy: 1, blinkT: 2, blink: false, happy: false, dropT: 0 };
     enemies = ENEMY_DEFS.map(([k, x, min, max, y], i) => ({ kind: k, x, min, max, y, oy: 0, vy: 0, dir: i % 2 ? 1 : -1,
       t: Math.random() * 5, alive: true, bonk: 0, hopT: rand(0.5, 1.5), land: 0 }));
-    key = { x: KEY_POS.x, y: KEY_POS.y, got: false, fx: 0, fy: 0, spark: 0 };
+    key = { x: KEY_POS.x, y: KEY_POS.y, area: 'cave', got: false, fx: 0, fy: 0, spark: 0 };
     gate = { state: 'closed', t: 0, shake: 0, hint: 0, cool: 0, open: 0, kx: 0, ky: 0 };
+    acorns = ACORN_POS.map(([x, y]) => ({ x, y, got: false, ph: Math.random() * TAU }));
+    acornCount = 0; popNum = null;
     particles.length = 0; rings.length = 0; uiParts.length = 0;
+    area = 'forest'; trans = null; portalHere = null;
     stompCount = 0; winT = 0; camX = 0; state = 'play';
+    clearInput();
+  }
+
+  function cameraTarget() {
+    const w = areaW();
+    if (viewW >= w) return (w - viewW) / 2;
+    return clamp(player.x - viewW * 0.4, 0, w - viewW);
+  }
+
+  // The portal the player is standing at, if any (with where to draw the up-arrow hint).
+  function findPortal() {
+    const p = player;
+    if (state !== 'play' || p.y < GY - 200) return null; // works mid-jump too
+    if (area === 'forest') {
+      if (Math.abs(p.x - CAVE_X) < 70) return { kind: 'cave', x: CAVE_X, y: GY - 240 };
+      if (gate.state === 'open' && p.x > GATE_X - 125) return { kind: 'gate', x: GATE_X, y: 240 };
+    } else if (Math.abs(p.x - CAVE_EXIT_X) < 70) return { kind: 'exit', x: CAVE_EXIT_X, y: GY - 215 };
+    return null;
+  }
+  function usePortal(pt) {
+    const p = player;
+    SFX.portal();
+    burst(p.x, p.y - 35, 20, SPARK.concat(['#c8a2ff', '#7be0ff']), 0.8, 0.8);
+    trans = { t: 0, dur: 0.9, done: false, color: pt.kind === 'gate' ? '255,250,220' : '24,16,48', go() {
+      particles.length = 0; rings.length = 0;
+      if (pt.kind === 'cave') { area = 'cave'; p.x = CAVE_EXIT_X; }
+      else if (pt.kind === 'exit') { area = 'forest'; p.x = CAVE_X; }
+      else { p.x = GATE_X + 150; state = 'win'; winT = 0; winSel = 0; hopT = 0.4; confettiT = 0; SFX.win(); }
+      p.y = GY; p.prevY = GY; p.vy = 0; p.vx = 0; p.kb = 0; p.onGround = true; p.face = 1;
+      if (key.got) { key.fx = p.x - 36; key.fy = p.y - 88; }
+      camX = cameraTarget();
+    } };
     clearInput();
   }
 
@@ -346,12 +443,12 @@
     if (dir) p.face = dir;
     p.x += (p.vx + p.kb) * dt;
     p.kb = approach(p.kb, 0, 1500 * dt);
-    const maxX = gate.open > 0.6 ? LEVEL_W - 80 : GATE_X - 112;
+    const maxX = state === 'win' ? LEVEL_W - 80 : area === 'cave' ? CAVE_W - 60 : gate.open > 0.6 ? GATE_X + 10 : GATE_X - 112;
     if (p.x < 40) { p.x = 40; p.kb = Math.max(0, p.kb); }
     if (p.x > maxX) { p.x = maxX; p.kb = Math.min(0, p.kb); }
 
     if (jumpQueued) { p.jumpBuf = 0.15; jumpQueued = false; }
-    p.jumpBuf -= dt; p.coyote -= dt;
+    p.jumpBuf -= dt; p.coyote -= dt; p.dropT -= dt;
     if (p.jumpBuf > 0 && auto === undefined) {
       if (p.onGround || p.coyote > 0) {
         p.vy = -JUMP_V; p.onGround = false; p.coyote = 0; p.jumpBuf = 0; p.sx = 0.8; p.sy = 1.25;
@@ -361,6 +458,11 @@
         SFX.flutter();
         burst(p.x, p.y - 20, 10, SPARK, 0.3, 1, 0.8, 200);
       }
+    }
+    // Down on a branch or ledge: drop through it.
+    if (auto === undefined && input.down && p.onGround && p.y < GY - 1) {
+      p.dropT = 0.22; p.onGround = false; p.y += 2; p.vy = 120; p.sx = 0.85; p.sy = 1.15;
+      SFX.drop();
     }
 
     p.vy += GRAV * dt;
@@ -374,7 +476,7 @@
     if (p.vy >= 0) {
       let land = null;
       if (p.y >= GY) land = GY;
-      else for (const pl of PLATS) {
+      else if (p.dropT <= 0) for (const pl of areaPlats()) {
         if (p.prevY <= pl.y + 1 && p.y >= pl.y && p.x > pl.x1 - 12 && p.x < pl.x2 + 12) { land = pl.y; break; }
       }
       if (land !== null) {
@@ -388,8 +490,10 @@
     }
     if (was && !p.onGround && p.vy >= 0) p.coyote = 0.12;
 
-    p.sx += (1 - p.sx) * Math.min(1, dt * 10);
-    p.sy += (1 - p.sy) * Math.min(1, dt * 10);
+    // Holding down on the ground: a little crouch.
+    const crouch = auto === undefined && input.down && p.onGround;
+    p.sx += ((crouch ? 1.15 : 1) - p.sx) * Math.min(1, dt * 10);
+    p.sy += ((crouch ? 0.8 : 1) - p.sy) * Math.min(1, dt * 10);
     p.blinkT -= dt;
     if (p.blinkT < 0) { p.blink = true; if (p.blinkT < -0.12) { p.blink = false; p.blinkT = rand(2, 5); } }
     p.inv -= dt;
@@ -416,7 +520,13 @@
 
   function updatePlay(dt) {
     const p = player;
-    if (state === 'play') updatePlayer(dt);
+    if (trans) {
+      trans.t += dt;
+      if (!trans.done && trans.t >= trans.dur / 2) { trans.done = true; trans.go(); }
+      if (trans.t >= trans.dur) trans = null;
+    }
+    const frozen = trans && !trans.done; // hold still while the circle closes
+    if (state === 'play') { if (!frozen) updatePlayer(dt); }
     else {
       // Win: walk into the meadow, then hop for joy.
       winT += dt;
@@ -433,17 +543,20 @@
       }
     }
 
-    for (const e of enemies) {
+    if (area === 'forest') for (const e of enemies) {
       if (!e.alive) continue;
       updateEnemy(e, dt);
-      if (state !== 'play') continue;
+      if (state !== 'play' || frozen) continue;
       const ey = e.y + e.oy, hw = e.kind === 'beetle' ? 28 : 25, hh = e.kind === 'beetle' ? 34 : 40;
       if (Math.abs(p.x - e.x) < hw + 20 && p.y > ey - hh && p.y - 60 < ey) {
         if (p.vy > 0 && p.prevY <= ey - hh + 22) {
           e.alive = false;
-          const cols = e.kind === 'beetle' ? ['#8f5be8', '#ffd23f', '#ff7ab6'] : ['#6fdc7a', '#c9ffb0', '#ffffff'];
-          burst(e.x, ey - hh / 2, 24, cols.concat(SPARK), 1, 0.6);
-          rings.push({ x: e.x, y: ey - hh / 2, r: 30, life: 0, color: cols[0] });
+          const cols = e.kind === 'beetle' ? ['#8f5be8', '#ffd23f', '#ff7ab6'] : [SLIME.body, SLIME.light, '#ffffff'];
+          const cy = ey - hh / 2;
+          burst(e.x, cy, 44, cols.concat(SPARK), 1.5, 0.6, 1.4);
+          burst(e.x, cy, 26, FAIRY, 0.55, 1, 1.1, -90); // fairy sparkles drift upward
+          rings.push({ x: e.x, y: cy, r: 36, life: 0, color: cols[0] });
+          rings.push({ x: e.x, y: cy, r: 18, life: -0.08, color: '#ffffff' });
           SFX.stomp(stompCount++);
           p.vy = -650; p.extra = true; p.onGround = false; p.sx = 0.8; p.sy = 1.2;
         } else if (p.inv <= 0) {
@@ -456,18 +569,41 @@
       }
     }
 
+    // Acorns
+    if (area === 'forest' && state === 'play' && !frozen) for (const a of acorns) {
+      if (a.got || Math.hypot(p.x - a.x, p.y - 34 - a.y) >= 58) continue;
+      a.got = true; acornCount++;
+      popNum = { n: acornCount, t: 0, big: acornCount === ACORN_POS.length, conf: 0 };
+      burst(a.x, a.y, 20, ['#c98a4a', '#ffe066', '#ffffff'], 0.9, 0.7);
+      burst(a.x, a.y, 12, FAIRY, 0.4, 1, 1, -90);
+      if (popNum.big) SFX.cheer(); else SFX.acorn(acornCount);
+    }
+    if (popNum) {
+      popNum.t += dt;
+      if (popNum.big && popNum.t < 2) {
+        popNum.conf -= dt;
+        if (popNum.conf <= 0) {
+          popNum.conf = 0.1;
+          burst(rand(0, W), -10, 6, RAINBOW, 0.5, 0.3, 1.5, 500, uiParts);
+        }
+      }
+      if (popNum.t > (popNum.big ? 2.8 : 1.5)) popNum = null;
+    }
+
     // Key
     if (!key.got) {
-      key.spark -= dt;
-      if (key.spark < 0) {
-        key.spark = 0.18;
-        burst(key.x + rand(-25, 25), key.y + rand(-20, 20), 1, SPARK, 0.12, 1, 0.7, -40);
-      }
-      if (Math.hypot(p.x - key.x, p.y - 34 - key.y) < 70) {
-        key.got = true; key.fx = key.x; key.fy = key.y;
-        SFX.key();
-        burst(key.x, key.y, 28, ['#ffcf33', '#fff7a8', '#ffffff', '#ff6fa8'], 1, 0.8);
-        rings.push({ x: key.x, y: key.y, r: 40, life: 0, color: '#ffcf33' });
+      if (area === key.area) {
+        key.spark -= dt;
+        if (key.spark < 0) {
+          key.spark = 0.18;
+          burst(key.x + rand(-25, 25), key.y + rand(-20, 20), 1, SPARK, 0.12, 1, 0.7, -40);
+        }
+        if (Math.hypot(p.x - key.x, p.y - 34 - key.y) < 70) {
+          key.got = true; key.fx = key.x; key.fy = key.y;
+          SFX.key();
+          burst(key.x, key.y, 28, ['#ffcf33', '#fff7a8', '#ffffff', '#ff6fa8'], 1, 0.8);
+          rings.push({ x: key.x, y: key.y, r: 40, life: 0, color: '#ffcf33' });
+        }
       }
     } else if (gate.state === 'closed') {
       const tx = p.x - p.face * 36, ty = p.y - 88 + Math.sin(T * 4) * 6;
@@ -477,7 +613,7 @@
 
     // Gate
     gate.cool -= dt; gate.shake = Math.max(0, gate.shake - dt); gate.hint = Math.max(0, gate.hint - dt);
-    if (gate.state === 'closed' && p.x >= GATE_X - 118) {
+    if (area === 'forest' && gate.state === 'closed' && p.x >= GATE_X - 118) {
       if (key.got) { gate.state = 'unlock'; gate.t = 0; gate.kx = key.fx; gate.ky = key.fy; }
       else if (gate.cool <= 0) { SFX.locked(); gate.shake = 0.5; gate.hint = 3; gate.cool = 1.6; }
     }
@@ -498,12 +634,15 @@
       gate.open = easeOut(Math.min(1, gate.t / 1.3));
       if (gate.t >= 1.3) gate.state = 'open';
     }
-    if (state === 'play' && p.x > GATE_X + 140) {
-      state = 'win'; winT = 0; winSel = 0; hopT = 0.4; confettiT = 0; clearInput(); SFX.win();
-    }
 
-    const target = clamp(p.x - viewW * 0.4, 0, Math.max(0, LEVEL_W - viewW));
-    camX += (target - camX) * Math.min(1, dt * 6);
+    // Up arrow: go into the cave, back out of it, or through the open gate.
+    portalHere = trans ? null : findPortal();
+    // A press is remembered briefly, so tapping up a moment early still works.
+    if (upQueued) { upQueued = false; upBuf = 0.35; }
+    upBuf -= dt;
+    if (upBuf > 0 && portalHere) { upBuf = 0; usePortal(portalHere); }
+
+    camX += (cameraTarget() - camX) * Math.min(1, dt * 6);
   }
 
   // ---------- Drawing helpers ----------
@@ -679,8 +818,8 @@
     else if (e.land > 0) { const k = e.land / 0.25; sx = 1 + 0.25 * k; sy = 1 - 0.2 * k; }
     if (e.bonk > 0) { sx *= 1 + Math.sin(e.bonk * 30) * 0.1; }
     ctx.save(); ctx.translate(e.x, y); ctx.scale(e.dir * sx, sy);
-    ell(0, -2, 24, 4, 0, '#4fb85c');
-    ctx.fillStyle = 'rgba(111,220,122,0.95)';
+    ell(0, -2, 24, 4, 0, SLIME.base);
+    ctx.fillStyle = SLIME.body;
     ctx.beginPath(); ctx.moveTo(-26, 0);
     ctx.bezierCurveTo(-30, -30, -14, -44, 0, -44); ctx.bezierCurveTo(14, -44, 30, -30, 26, 0);
     ctx.closePath(); ctx.fill();
@@ -689,8 +828,145 @@
     circ(0, -24, 6.5, '#fff'); circ(14, -24, 6.5, '#fff');
     circ(2, -23, 3.3, '#2b2d42'); circ(16, -23, 3.3, '#2b2d42');
     circ(3, -24.5, 1.1, '#fff'); circ(17, -24.5, 1.1, '#fff');
-    ell(8, -12, 4, 3, 0, '#2b6b35');
+    ell(8, -12, 4, 3, 0, SLIME.mouth);
     ctx.restore();
+  }
+
+  // ---------- Acorns ----------
+  function drawAcorn(x, y, s) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ell(0, 5, 12, 14, 0, '#c98a4a');
+    ell(-4, 5, 3.5, 7, 0, 'rgba(255,255,255,0.3)');
+    circ(0, 19, 2, '#8a5a30');
+    ctx.fillStyle = '#7a4a24'; ctx.beginPath(); ctx.ellipse(0, -4, 15, 10, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#6b3f1f'; rr(-15, -6, 30, 6, 3); ctx.fill();
+    for (const [dx, dy] of [[-8, -8], [0, -10], [8, -8], [-4, -4], [4, -4]]) circ(dx, dy, 1.6, '#9a6534');
+    ctx.fillStyle = '#5a3418'; ctx.fillRect(-1.5, -19, 3, 6);
+    ctx.restore();
+  }
+
+  // ---------- Cave ----------
+  function drawCrystal(x, y, s, col) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(Math.abs(s), s);
+    ctx.globalAlpha = 0.22 + 0.12 * Math.sin(T * 2 + x);
+    circ(0, -30, 48, col);
+    ctx.globalAlpha = 1;
+    for (const [dx, h, w, rot] of [[-14, 46, 10, -0.35], [0, 66, 13, 0], [15, 40, 9, 0.4]]) {
+      ctx.save(); ctx.translate(dx, 0); ctx.rotate(rot);
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(-w, 0); ctx.lineTo(-w, -h * 0.7); ctx.lineTo(0, -h); ctx.lineTo(w, -h * 0.7); ctx.lineTo(w, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath(); ctx.moveTo(-w * 0.5, -2); ctx.lineTo(-w * 0.5, -h * 0.65); ctx.lineTo(0, -h * 0.92); ctx.lineTo(0, -2); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  // The cave mouth in the forest: a mossy rock mound with a glowing dark opening.
+  function drawCaveMouth() {
+    const x = CAVE_X;
+    if (x + 220 < camX || x - 220 > camX + viewW) return;
+    ctx.fillStyle = '#8f88ad';
+    ctx.beginPath(); ctx.moveTo(x - 160, GY + 6);
+    ctx.bezierCurveTo(x - 160, GY - 150, x - 80, GY - 205, x + 5, GY - 200);
+    ctx.bezierCurveTo(x + 100, GY - 195, x + 160, GY - 130, x + 160, GY + 6); ctx.closePath(); ctx.fill();
+    circ(x - 95, GY - 110, 30, '#a39dc0'); circ(x + 85, GY - 125, 26, '#a39dc0'); ell(x - 15, GY - 178, 45, 16, 0, '#a39dc0');
+    ctx.fillStyle = '#5cc640';
+    ctx.beginPath();
+    for (const [dx, dy, r] of [[-60, -188, 22], [-25, -200, 26], [15, -202, 24], [55, -190, 20], [90, -165, 16], [-100, -160, 16]]) {
+      ctx.moveTo(x + dx + r, GY + dy); ctx.arc(x + dx, GY + dy, r, 0, TAU);
+    }
+    ctx.fill();
+    circ(x - 30, GY - 212, 5, '#ff6fa8'); circ(x + 30, GY - 214, 5, '#ffd23f'); circ(x + 75, GY - 186, 4, '#ffffff');
+    keyGlow(x, GY - 60, 120, 0.35 + 0.1 * Math.sin(T * 2));
+    ctx.fillStyle = '#2a1f4a';
+    ctx.beginPath(); ctx.moveTo(x - 58, GY + 2); ctx.lineTo(x - 58, GY - 72); ctx.arc(x, GY - 72, 58, Math.PI, 0); ctx.lineTo(x + 58, GY + 2); ctx.closePath(); ctx.fill();
+    drawCrystal(x - 36, GY, 0.5, '#7be0ff'); drawCrystal(x + 38, GY, 0.42, '#ff8fd8');
+    for (let k = 0; k < 6; k++) {
+      const a = Math.PI + (k + 0.5) * Math.PI / 6, tw = 0.5 + 0.5 * Math.sin(T * 4 + k * 1.7);
+      ctx.globalAlpha = tw; ctx.fillStyle = '#fff7a8';
+      starPath(x + Math.cos(a) * 82, GY - 72 + Math.sin(a) * 82, 7, T + k); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawCave() {
+    screen();
+    ctx.fillStyle = caveGrad; ctx.fillRect(0, 0, W, H);
+    setLayer(0.5);
+    ctx.fillStyle = '#2c2150';
+    ctx.beginPath();
+    const bx0 = camX * 0.5 - 200;
+    for (let i = Math.floor(bx0 / 160); i * 160 < bx0 + viewW + 400; i++) {
+      const cx = i * 160 + hash(i * 5.3) * 80, cy = 200 + hash(i * 2.1) * 350, r = 70 + hash(i * 7.9) * 70;
+      ctx.moveTo(cx + r, cy); ctx.arc(cx, cy, r, 0, TAU);
+    }
+    ctx.fill();
+    setLayer(1);
+    const x0 = Math.min(0, camX) - 300, x1 = Math.max(CAVE_W, camX + viewW) + 300;
+    // ceiling with stalactites
+    ctx.fillStyle = '#241a44';
+    ctx.fillRect(x0, viewTop - 20, x1 - x0, 80 - viewTop);
+    ctx.beginPath();
+    for (let i = Math.floor(x0 / 90); i * 90 < x1; i++) {
+      const sx = i * 90 + hash(i * 3.3) * 30, len = 40 + hash(i * 6.1) * 80;
+      ctx.moveTo(sx - 26, 78); ctx.lineTo(sx + 26, 78); ctx.lineTo(sx + 2, 78 + len); ctx.closePath();
+    }
+    ctx.fill();
+    // daylight through the way out
+    const ex = CAVE_EXIT_X;
+    keyGlow(ex, GY - 90, 190, 0.55);
+    ctx.fillStyle = '#c9f1ff';
+    ctx.beginPath(); ctx.moveTo(ex - 62, GY + 2); ctx.lineTo(ex - 62, GY - 90); ctx.arc(ex, GY - 90, 62, Math.PI, 0); ctx.lineTo(ex + 62, GY + 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#9be08a'; ctx.fillRect(ex - 62, GY - 34, 124, 36);
+    circ(ex + 25, GY - 115, 14, '#fff6c2');
+    ctx.strokeStyle = '#4a3a78'; ctx.lineWidth = 18;
+    ctx.beginPath(); ctx.moveTo(ex - 62, GY + 2); ctx.lineTo(ex - 62, GY - 90); ctx.arc(ex, GY - 90, 62, Math.PI, 0); ctx.lineTo(ex + 62, GY + 2); ctx.stroke();
+    for (let k = 0; k <= 6; k++) {
+      const a = Math.PI + k * Math.PI / 6;
+      circ(ex + Math.cos(a) * 70, GY - 90 + Math.sin(a) * 70, 8, k % 2 ? '#4fb357' : '#63c766');
+    }
+    // side walls
+    ctx.fillStyle = '#241a44';
+    ctx.fillRect(x0, viewTop - 20, 40 - x0, VH - viewTop + 40);
+    ctx.fillRect(CAVE_W - 40, viewTop - 20, x1 - CAVE_W + 40, VH - viewTop + 40);
+    ctx.beginPath();
+    for (let y = 80; y < GY; y += 70) {
+      ctx.moveTo(40 + 30, y); ctx.arc(40, y, 30, 0, TAU);
+      ctx.moveTo(CAVE_W - 40 + 30, y + 35); ctx.arc(CAVE_W - 40, y + 35, 30, 0, TAU);
+    }
+    ctx.fill();
+    // rock ledges
+    for (const pl of CAVE_PLATS) {
+      ctx.fillStyle = '#5b4a86'; rr(pl.x1, pl.y - 2, pl.x2 - pl.x1, 34, 14); ctx.fill();
+      ctx.fillStyle = '#7b6aa8'; rr(pl.x1 + 4, pl.y - 2, pl.x2 - pl.x1 - 8, 9, 4); ctx.fill();
+      ctx.fillStyle = '#5b4a86'; ctx.beginPath();
+      for (let x = pl.x1 + 30; x < pl.x2 - 20; x += 50) { ctx.moveTo(x - 12, pl.y + 30); ctx.lineTo(x + 12, pl.y + 30); ctx.lineTo(x, pl.y + 58); ctx.closePath(); }
+      ctx.fill();
+    }
+    // floor
+    ctx.fillStyle = '#3b2f5c'; ctx.fillRect(x0, GY, x1 - x0, VH - GY + 200);
+    ctx.fillStyle = '#6a5a99'; ctx.fillRect(x0, GY - 4, x1 - x0, 12);
+    for (let i = Math.floor(x0 / 60); i * 60 < x1; i++) ell(i * 60 + hash(i) * 30, GY + 40 + hash(i * 2.9) * 50, 9, 5, 0, '#4a3c70');
+    for (const [x, y, s, c] of CRYSTALS) drawCrystal(x, y, s, c);
+    for (const mx of [460, 700, 1290]) {
+      circ(mx, GY - 14, 26, `rgba(123,224,255,${0.18 + 0.1 * Math.sin(T * 2 + mx)})`);
+      ell(mx, GY - 7, 5, 9, 0, '#e6f7ff');
+      ctx.fillStyle = '#5fc8ff'; ctx.beginPath(); ctx.ellipse(mx, GY - 14, 15, 11, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+      circ(mx - 5, GY - 19, 2.4, '#fff'); circ(mx + 6, GY - 20, 2, '#fff');
+    }
+  }
+  function drawCaveMotes() {
+    for (let i = 0; i < 45; i++) {
+      const bx = hash(i * 4.1) * CAVE_W, by = 120 + hash(i * 6.3) * 460, ph = hash(i * 9.7) * TAU;
+      const x = bx + Math.sin(T * 0.4 + ph) * 30, y = by + Math.cos(T * 0.6 + ph) * 22, a = 0.5 + 0.5 * Math.sin(T * 2.5 + ph * 2);
+      circ(x, y, 8, `rgba(170,220,255,${0.16 * a})`);
+      circ(x, y, 2.6, `rgba(220,245,255,${0.9 * a})`);
+    }
+  }
+  function drawUpHint(pt) {
+    const x = pt.x, y = pt.y + Math.sin(T * 5) * 8;
+    circ(x, y, 36, 'rgba(255,255,255,0.92)');
+    ctx.fillStyle = '#ffb300';
+    ctx.beginPath(); ctx.moveTo(x, y - 20); ctx.lineTo(x + 20, y + 11); ctx.lineTo(x - 20, y + 11); ctx.closePath(); ctx.fill();
   }
 
   // ---------- Key ----------
@@ -944,7 +1220,9 @@
   }
   function drawParticleList(list) {
     for (const p of list) {
-      ctx.globalAlpha = Math.max(0, 1 - p.life / p.max);
+      // Upward-drifting (fairy) sparkles twinkle as they fade.
+      const tw = p.g < 0 ? 0.55 + 0.45 * Math.sin(p.life * 28 + p.rot * 3) : 1;
+      ctx.globalAlpha = Math.max(0, 1 - p.life / p.max) * tw;
       ctx.fillStyle = p.color;
       if (p.star) { starPath(p.x, p.y, p.size * 1.4, p.rot); ctx.fill(); }
       else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 0.8, 0, TAU); ctx.fill(); }
@@ -955,7 +1233,7 @@
   function drawPlayer() {
     const p = player;
     let sy = GY;
-    for (const pl of PLATS) if (p.x > pl.x1 - 12 && p.x < pl.x2 + 12 && pl.y >= p.y - 1 && pl.y < sy) sy = pl.y;
+    for (const pl of areaPlats()) if (p.x > pl.x1 - 12 && p.x < pl.x2 + 12 && pl.y >= p.y - 1 && pl.y < sy) sy = pl.y;
     const k = clamp(1 - (sy - p.y) / 400, 0.3, 1);
     ell(p.x, sy, 24 * k, 5 * k, 0, 'rgba(40,60,30,0.2)');
     if (p.inv > 0 && Math.floor(p.inv * 14) % 2) ctx.globalAlpha = 0.5;
@@ -965,24 +1243,38 @@
   }
 
   function drawScene(withGame) {
-    drawSky();
-    drawHills(0.1, 430, '#d2f0e0', 170, 120, 70, 0);
-    drawHills(0.25, 500, '#b3e3c7', 140, 100, 70, 300);
-    drawMid();
-    drawRays();
-    drawTrees();
-    if (withGame) drawGateBack();
-    drawGround();
-    if (withGame) drawGateFront();
-    drawDecor();
+    const inCave = withGame && area === 'cave';
+    if (inCave) drawCave();
+    else {
+      drawSky();
+      drawHills(0.1, 430, '#d2f0e0', 170, 120, 70, 0);
+      drawHills(0.25, 500, '#b3e3c7', 140, 100, 70, 300);
+      drawMid();
+      drawRays();
+      drawTrees();
+      if (withGame) drawGateBack();
+      drawGround();
+      if (withGame) drawGateFront();
+      drawDecor();
+      if (withGame) drawCaveMouth();
+    }
     if (withGame) {
-      if (!key.got) {
+      if (!key.got && key.area === area) {
         const by = key.y + Math.sin(T * 3) * 8;
         keyGlow(key.x, by, 70, 0.75);
         drawKey(key.x, by, 1.3, -0.4 + Math.sin(T * 2) * 0.15);
       }
-      for (const e of enemies) if (e.alive) (e.kind === 'beetle' ? drawBeetle : drawSlime)(e);
+      if (!inCave) {
+        for (const a of acorns) {
+          if (a.got) continue;
+          const ay = a.y + Math.sin(T * 3 + a.ph) * 5;
+          keyGlow(a.x, ay, 42, 0.5);
+          drawAcorn(a.x, ay, 1.3);
+        }
+        for (const e of enemies) if (e.alive) (e.kind === 'beetle' ? drawBeetle : drawSlime)(e);
+      }
       drawPlayer();
+      if (portalHere) drawUpHint(portalHere);
       if (key.got && gate.state !== 'opening' && gate.state !== 'open') {
         keyGlow(key.fx, key.fy, 45, 0.6);
         drawKey(key.fx, key.fy, 1, -0.4 + Math.sin(T * 3) * 0.2);
@@ -1004,9 +1296,8 @@
       ctx.globalAlpha = 1;
     }
     drawParticleList(particles);
-    drawButterflies();
-    drawLeaves();
-    drawMotes();
+    if (inCave) drawCaveMotes();
+    else { drawButterflies(); drawLeaves(); drawMotes(); }
   }
 
   // ---------- HUD and on-screen buttons ----------
@@ -1020,22 +1311,70 @@
     ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
     drawKey(-r * 0.08, 0, r / 32, -0.5, !key.got);
     ctx.restore();
+
+    // Acorn counter, e.g. "2/5", next to the key slot
+    const cx = x + r + 14, h = r * 1.5, w = r * 3.4;
+    const bump = popNum && popNum.t < 0.5 ? 1 + 0.2 * Math.sin(popNum.t * 20) * (1 - popNum.t * 2) : 1;
+    ctx.save(); ctx.translate(cx + w / 2, y); ctx.scale(bump, bump);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; rr(-w / 2, -h / 2, w, h, h / 2); ctx.fill();
+    ctx.strokeStyle = acornCount === ACORN_POS.length ? '#ffcf33' : 'rgba(255,255,255,0.9)'; ctx.lineWidth = r * 0.1; ctx.stroke();
+    drawAcorn(-w / 2 + h * 0.5, 0, r / 30);
+    ctx.font = `900 ${Math.round(r * 0.95)}px "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round'; ctx.lineWidth = r * 0.16; ctx.strokeStyle = '#7a4a24';
+    const txt = `${acornCount}/${ACORN_POS.length}`;
+    ctx.strokeText(txt, h * 0.42, 2); ctx.fillStyle = '#ffd23f'; ctx.fillText(txt, h * 0.42, 2);
+    ctx.restore();
+  }
+
+  // The big bouncing number in the middle of the screen when an acorn is picked up.
+  function drawPopNum() {
+    if (!popNum) return;
+    screen();
+    const t = popNum.t, dur = popNum.big ? 2.8 : 1.5;
+    const grow = easeOut(Math.min(1, t / 0.2));
+    const wobble = 1 + Math.sin(t * 14) * Math.exp(-t * 3.5) * 0.3;
+    const hop = Math.abs(Math.sin(t * (popNum.big ? 8 : 7))) * Math.exp(-t * (popNum.big ? 1 : 2)) * S * 0.1;
+    const size = S * (popNum.big ? 0.46 : 0.34) * grow * wobble;
+    if (size < 1) return;
+    ctx.save();
+    ctx.globalAlpha = clamp((dur - t) / 0.35, 0, 1);
+    ctx.translate(W / 2, H * 0.42 - hop);
+    if (popNum.big) ctx.rotate(Math.sin(t * 6) * 0.08);
+    ctx.font = `900 ${Math.round(size)}px "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    ctx.lineWidth = size * 0.12; ctx.strokeStyle = popNum.big ? '#9d4edd' : '#7a4a24';
+    ctx.strokeText(String(popNum.n), 0, 0);
+    if (popNum.big) {
+      const g = ctx.createLinearGradient(0, -size * 0.4, 0, size * 0.4);
+      RAINBOW.forEach((c, i) => g.addColorStop(i / (RAINBOW.length - 1), c));
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = '#ffd23f';
+    ctx.fillText(String(popNum.n), 0, 0);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText(String(popNum.n), -size * 0.03, -size * 0.04);
+    ctx.restore();
   }
   function drawControls() {
     screen();
-    for (const name of ['left', 'right', 'jump']) {
-      const b = BTN[name], on = input[name];
-      ctx.save(); ctx.translate(b.x, b.y); const s = on ? 0.92 : 1; ctx.scale(s, s);
-      circ(0, 0, b.r, on ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.38)');
+    const ROT = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
+    for (const name of ['up', 'down', 'left', 'right', 'jump']) {
+      const b = BTN[name], on = input[name], glow = name === 'up' && portalHere;
+      ctx.save(); ctx.translate(b.x, b.y);
+      const s = on ? 0.92 : glow ? 1 + 0.1 * Math.sin(T * 8) : 1; ctx.scale(s, s);
+      circ(0, 0, b.r, on ? 'rgba(255,255,255,0.75)' : glow ? 'rgba(255,214,90,0.85)' : 'rgba(255,255,255,0.38)');
       ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = b.r * 0.08;
       ctx.beginPath(); ctx.arc(0, 0, b.r, 0, TAU); ctx.stroke();
       ctx.fillStyle = on ? '#2f8a4a' : 'rgba(40,110,60,0.85)';
-      const a = b.r * 0.42;
-      ctx.beginPath();
-      if (name === 'left') { ctx.moveTo(-a, 0); ctx.lineTo(a * 0.6, -a); ctx.lineTo(a * 0.6, a); }
-      else if (name === 'right') { ctx.moveTo(a, 0); ctx.lineTo(-a * 0.6, -a); ctx.lineTo(-a * 0.6, a); }
-      else { ctx.moveTo(0, -a * 1.1); ctx.lineTo(a, a * 0.5); ctx.lineTo(-a, a * 0.5); }
-      ctx.closePath(); ctx.fill();
+      if (name === 'jump') {
+        // Jump is a big star, so it doesn't look like the up arrow.
+        ctx.fillStyle = on ? '#e0a800' : 'rgba(255,190,0,0.95)';
+        starPath(0, 0, b.r * 0.55, -Math.PI / 2); ctx.fill();
+      } else {
+        const a = b.r * 0.45;
+        ctx.rotate(ROT[name]);
+        ctx.beginPath(); ctx.moveTo(a, 0); ctx.lineTo(-a * 0.6, -a); ctx.lineTo(-a * 0.6, a); ctx.closePath(); ctx.fill();
+      }
       ctx.restore();
     }
   }
@@ -1141,6 +1480,7 @@
       if (pp.jump) { initAudio(); chooseCard(padSel); }
     } else if (state === 'play') {
       if (pp.jump) { initAudio(); jumpQueued = true; }
+      if (pp.up) upQueued = true;
     } else if (state === 'win' && winT > 2.2) {
       if (pp.left && winSel !== 0) { winSel = 0; SFX.sparkle(); }
       if (pp.right && winSel !== 1) { winSel = 1; SFX.sparkle(); }
@@ -1159,9 +1499,22 @@
       drawHUD();
       if (state === 'play') drawControls();
       else drawWinButtons();
+      drawPopNum();
       screen(); drawParticleList(uiParts);
+      drawTransition();
     }
     requestAnimationFrame(frame);
+  }
+
+  // Circle wipe: closes around the animal, switches place, then opens again.
+  function drawTransition() {
+    if (!trans) return;
+    screen();
+    const k = trans.t / trans.dur, closed = easeInOut(clamp(k < 0.5 ? k * 2 : (1 - k) * 2, 0, 1));
+    const p = player, px = (p.x - camX) * sc, py = offY + (p.y - 35) * sc;
+    const r = Math.hypot(W, H) * (1 - closed);
+    ctx.fillStyle = `rgb(${trans.color})`;
+    ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(px, py, Math.max(0, r), 0, TAU, true); ctx.fill('evenodd');
   }
 
   // ---------- Events ----------
@@ -1173,9 +1526,10 @@
     initAudio();
     const x = e.clientX, y = e.clientY;
     if (state === 'play') {
-      const r = roleFor(x);
+      const r = roleFor(x, y);
       pointers.set(e.pointerId, r);
       if (r === 'jump') jumpQueued = true;
+      if (r === 'up') upQueued = true;
       refreshInput();
     } else if (state === 'select') selectTap(x, y);
     else if (state === 'win') winTap(x, y);
@@ -1183,7 +1537,9 @@
   canvas.addEventListener('pointermove', e => {
     const r = pointers.get(e.pointerId);
     if (!r || r === 'jump' || e.clientX > W * 0.5) return;
-    pointers.set(e.pointerId, roleFor(e.clientX));
+    const nr = roleFor(e.clientX, e.clientY);
+    if (nr === 'up' && r !== 'up') upQueued = true; // sliding a thumb onto up counts as a press
+    pointers.set(e.pointerId, nr);
     refreshInput();
   });
   const release = e => { if (pointers.delete(e.pointerId)) refreshInput(); };
@@ -1191,7 +1547,8 @@
   canvas.addEventListener('pointercancel', release);
   canvas.addEventListener('pointerleave', release);
 
-  const KEYMAP = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'jump', ArrowUp: 'jump', KeyW: 'jump' };
+  const KEYMAP = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up',
+    ArrowDown: 'down', KeyS: 'down', Space: 'jump' };
   window.addEventListener('keydown', e => {
     const k = KEYMAP[e.code];
     if (!k) return;
@@ -1202,6 +1559,7 @@
       return;
     }
     if (k === 'jump' && !e.repeat && !keys.jump) jumpQueued = true;
+    if (k === 'up' && !e.repeat && !keys.up) upQueued = true;
     keys[k] = true; refreshInput();
   });
   window.addEventListener('keyup', e => {
