@@ -1,6 +1,6 @@
 // Caches the game so it works offline once it's been opened once.
 // Bump CACHE when files change so devices pick up the new version.
-const CACHE = 'forest-friends-v2';
+const CACHE = 'forest-friends-v3';
 const FILES = ['./', 'index.html', 'manifest.json', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

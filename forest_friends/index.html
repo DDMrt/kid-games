@@ -33,10 +33,33 @@
   }
   #play svg { width: 48%; height: 48%; margin-left: 9%; }
   @keyframes pulse { 50% { transform: scale(1.08); } }
+  /* Phones held upright: the game is too narrow, so cover it with a "turn me sideways" picture.
+     iPhone ignores the manifest's landscape setting, so this is the only way to keep it landscape. */
+  #rotate {
+    position: fixed; inset: 0; z-index: 10; display: none;
+    align-items: center; justify-content: center;
+    background: linear-gradient(#7fd3ff, #c9f1ff 55%, #9be08a 56%, #5cc640);
+  }
+  #rotate svg { width: 70vw; height: 70vw; }
+  #rotate .phone { transform-origin: 50px 50px; animation: turn 2.6s ease-in-out infinite; }
+  @keyframes turn { 0%, 25% { transform: rotate(0deg); } 55%, 90% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
+  @media (orientation: portrait) and (max-width: 600px) { #rotate { display: flex; } }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="rotate" aria-label="Turn the phone sideways">
+  <svg viewBox="0 0 100 100">
+    <path d="M 22 30 A 34 34 0 0 1 70 16" fill="none" stroke="#ffcf3a" stroke-width="6" stroke-linecap="round"/>
+    <polygon points="64,6 80,16 64,26" fill="#ffcf3a"/>
+    <g class="phone">
+      <rect x="32" y="20" width="36" height="60" rx="7" fill="#fff" stroke="#3a2b63" stroke-width="3"/>
+      <rect x="37" y="28" width="26" height="44" rx="3" fill="#7fd3ff"/>
+      <rect x="37" y="58" width="26" height="14" rx="2" fill="#5cc640"/>
+      <circle cx="50" cy="52" r="6" fill="#c98a4b"/>
+    </g>
+  </svg>
+</div>
 <div id="start">
   <button id="play" aria-label="Play">
     <svg viewBox="0 0 10 10"><polygon points="1,0 10,5 1,10" fill="#fff"/></svg>
@@ -109,7 +132,7 @@
     PLATS.push({ y, side, tx: t.x, x1: side > 0 ? t.x + 25 : t.x - 35 - len, x2: side > 0 ? t.x + 35 + len : t.x - 25 });
   }
   // Secret cave: its mouth sits on the forest floor at CAVE_X; press up there to go in.
-  // Inside is a small room (CAVE_W wide) with the key on a high ledge, and the way out at CAVE_EXIT_X.
+  // Inside is a small room (CAVE_W wide) with the key on a high ledge, and the way out near the left (caveExitX(), just right of the arrow pad).
   const CAVE_X = 3120, CAVE_W = 1500, CAVE_EXIT_X = 170;
   const CAVE_PLATS = [{ x1: 620, x2: 830, y: 470, rock: true }, { x1: 900, x2: 1130, y: 360, rock: true }];
   const KEY_POS = { x: 1015, y: 300 }; // inside the cave
@@ -389,7 +412,7 @@
   const areaPlats = () => area === 'cave' ? CAVE_PLATS : PLATS;
 
   function startLevel(kind) {
-    player = { kind, x: 150, y: GY, prevY: GY, vx: 0, vy: 0, kb: 0, face: 1, onGround: true, coyote: 0, jumpBuf: 0,
+    player = { kind, x: Math.max(150, padClear()), y: GY, prevY: GY, vx: 0, vy: 0, kb: 0, face: 1, onGround: true, coyote: 0, jumpBuf: 0,
       extra: true, inv: 0, t: 0, sx: 1, sy: 1, blinkT: 2, blink: false, happy: false, dropT: 0 };
     enemies = ENEMY_DEFS.map(([k, x, min, max, y], i) => ({ kind: k, x, min, max, y, oy: 0, vy: 0, dir: i % 2 ? 1 : -1,
       t: Math.random() * 5, alive: true, bonk: 0, hopT: rand(0.5, 1.5), land: 0 }));
@@ -403,10 +426,17 @@
     clearInput();
   }
 
+  // How far from the screen's left edge (in world units) the animal must stand to be clear of the arrow pad.
+  function padClear() { return BTN.right ? (BTN.right.x + BTN.right.r + 16) / sc + 45 : 150; }
+  // The cave's doorway sits just right of the arrow pad, so the animal never appears behind the buttons.
+  function caveExitX() {
+    const c = viewW >= CAVE_W ? (CAVE_W - viewW) / 2 : 0;
+    return clamp(c + padClear(), CAVE_EXIT_X, 480);
+  }
   function cameraTarget() {
     const w = areaW();
     if (viewW >= w) return (w - viewW) / 2;
-    return clamp(player.x - viewW * 0.4, 0, w - viewW);
+    return clamp(player.x - Math.max(viewW * 0.4, padClear()), 0, w - viewW);
   }
 
   // The portal the player is standing at, if any (with where to draw the up-arrow hint).
@@ -416,7 +446,7 @@
     if (area === 'forest') {
       if (Math.abs(p.x - CAVE_X) < 70) return { kind: 'cave', x: CAVE_X, y: GY - 240 };
       if (gate.state === 'open' && p.x > GATE_X - 125) return { kind: 'gate', x: GATE_X, y: 240 };
-    } else if (Math.abs(p.x - CAVE_EXIT_X) < 70) return { kind: 'exit', x: CAVE_EXIT_X, y: GY - 215 };
+    } else if (Math.abs(p.x - caveExitX()) < 70) return { kind: 'exit', x: caveExitX(), y: GY - 215 };
     return null;
   }
   function usePortal(pt) {
@@ -425,7 +455,7 @@
     burst(p.x, p.y - 35, 20, SPARK.concat(['#c8a2ff', '#7be0ff']), 0.8, 0.8);
     trans = { t: 0, dur: 0.9, done: false, color: pt.kind === 'gate' ? '255,250,220' : '24,16,48', go() {
       particles.length = 0; rings.length = 0;
-      if (pt.kind === 'cave') { area = 'cave'; p.x = CAVE_EXIT_X; }
+      if (pt.kind === 'cave') { area = 'cave'; p.x = caveExitX(); }
       else if (pt.kind === 'exit') { area = 'forest'; p.x = CAVE_X; }
       else { p.x = GATE_X + 150; state = 'win'; winT = 0; winSel = 0; hopT = 0.4; confettiT = 0; SFX.win(); }
       p.y = GY; p.prevY = GY; p.vy = 0; p.vx = 0; p.kb = 0; p.onGround = true; p.face = 1;
@@ -912,7 +942,7 @@
     }
     ctx.fill();
     // daylight through the way out
-    const ex = CAVE_EXIT_X;
+    const ex = caveExitX();
     keyGlow(ex, GY - 90, 190, 0.55);
     ctx.fillStyle = '#c9f1ff';
     ctx.beginPath(); ctx.moveTo(ex - 62, GY + 2); ctx.lineTo(ex - 62, GY - 90); ctx.arc(ex, GY - 90, 62, Math.PI, 0); ctx.lineTo(ex + 62, GY + 2); ctx.closePath(); ctx.fill();
@@ -1465,6 +1495,8 @@
   function frame(now) {
     const dt = Math.min(1 / 30, (now - last) / 1000 || 0);
     last = now; T += dt;
+    // Phone held upright: the "turn sideways" picture covers the game, so hold everything still.
+    if (W < H && W <= 600) { clearInput(); requestAnimationFrame(frame); return; }
     const pp = pollPad();
     refreshInput();
     if (state === 'title') {

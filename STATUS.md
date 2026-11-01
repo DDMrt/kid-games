@@ -48,6 +48,15 @@ and Ori-style vertical movement).
   daylight exit on the left. ▲ at the exit returns to the cave mouth. A
   bouncing ▲ bubble appears whenever a portal is usable, and the ▲ button
   glows. ▲ works mid-jump and is remembered for about 0.35s.
+- The animal never appears behind the arrow pad: at the level start, in the
+  cave and coming back out, it stands just right of the arrows (worked out
+  from the screen size). The cave's doorway moves with it, and in narrow
+  portrait views the camera keeps the animal clear of the pad while walking.
+- **Landscape only on phones.** A phone held upright (portrait, up to 600px
+  wide) shows a full-screen "turn me sideways" picture (a phone rotating,
+  with a gold arrow) and the game holds still until it's turned. iPhone
+  ignores the manifest's `orientation: landscape`, so this overlay is what
+  enforces it. Tablets and PC aren't affected.
 - The gate at the end stays shut without the key: the animal shows a "key"
   thought bubble and the key slot pulses. With the key, the key flies into
   the lock and the doors open. Then **▲ goes through** with a golden
