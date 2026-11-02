@@ -215,5 +215,9 @@ isn't a copy of level 1). The cave stays at `CAVE_X`.
    iPhone.
 2. Play-test on the Fire tablet and PC if not done yet. Tune speed, jump
    height, button size and difficulty from how he actually plays.
-3. When changing a game, bump `CACHE` in its `sw.js` so the installed iPhone
-   copy picks up the new version (open it once while online).
+3. When changing a game, bump `CACHE` in its `sw.js`. Since 2026-11-01 the
+   service worker is network-first (it used to be cache-first, which showed
+   the old version on the first load after every push and confused testing),
+   so online visits always get the newest version and the saved copy is only
+   for offline. Devices that still have the old cache-first worker need one
+   more load (or close and reopen) to switch over.
