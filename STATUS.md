@@ -1,6 +1,6 @@
 # games — Status
 
-**Last updated:** 2026-11-01
+**Last updated:** 2026-11-01 (evening)
 
 ## Where things stand
 
@@ -39,8 +39,10 @@ and Ori-style vertical movement).
   restarts.
 - 5 acorns sit on branches (`ACORN_POS`). A counter like "2/5" sits next to
   the key slot. Each acorn makes a big number pop and bounce in the middle
-  of the screen, with its own sound for 1 to 4. The 5th gets a rainbow 5,
-  confetti and a cheering crowd.
+  of the screen, with its own sound for 1 to 4. The 5th (in every level)
+  gets a rainbow 5, confetti and curly paper streamers falling, and a short
+  catchy tune, "da-da-da-DAA, da-DAAA!" (`SFX.cheer`, Dillon's choice over a
+  party-noise version).
 - Portals use up (▲). The **key is hidden in a secret cave**: the cave mouth
   is a mossy rock mound on the forest floor at `CAVE_X` (between the 5th and
   6th trees). ▲ there goes inside, with a circle-wipe transition. The cave is
@@ -61,13 +63,133 @@ and Ori-style vertical movement).
   thought bubble and the key slot pulses. With the key, the key flies into
   the lock and the doors open. Then **▲ goes through** with a golden
   wipe, a rainbow and the win screen.
-- Win screen: confetti, then two buttons: replay (green arrow) and choose
-  animal (orange paw).
+- Going through either end gate (▲ at the open gate): the animal walks to
+  the middle of the doorway, bounces 3 times (each a little higher, with a
+  rising "boing"), then spins faster and faster while shrinking away to
+  nothing in a swirl of sparkles. Then the wipe starts (`updateExitAnim`).
+- Each level's gate leads straight into the next level with a wipe (dark
+  blue into the night forest, sky blue into the beach) and unlocks it on that
+  device (`localStorage` key `ff_unlocked`). The last level (`MAX_LEVEL`,
+  now 3) ends at the win screen.
+- **End doors, one per level** (`drawGateFront`): all share the same doorway
+  and lock position. Level 1: a giant tree with a round-topped wooden double
+  door, a lit round window, mushrooms and flowers at its roots. Level 2: the
+  same tree at night, with two glowing lanterns and glowing blue mushrooms.
+  Level 3: a driftwood gateway with faded blue plank doors, rope handles, a
+  fishing net, buoys, shells and starfish. Light pours out when the doors open.
+- Win screen (end of the last level): confetti, then two buttons: replay
+  (green arrow, replays the same level) and choose animal (orange paw).
+- **Level picker**: once level 2 is unlocked, choosing an animal leads to one
+  big picture card per unlocked level (in a row on wide screens, two per row
+  on tall ones). Before that, picking an animal goes straight into level 1.
+- Levels come in pairs, per Dillon: each place gets a day level and a
+  night/sunset level (forest: 1 day, 2 night; beach: 3 day, 4 next).
+
+### forest_friends level 3: Pacific Northwest beach, day (built 2026-11-01, not yet play-tested)
+
+Dillon's design: a big bay, with cliffs and evergreens on the left and right
+in the background and the ocean in the middle.
+- Background: snowy mountains across the bay, clouds, and seagulls gliding by (sometimes calling). Gentle low-tide waves lap on
+  the far wet sand (they never reach the animal) with a soft wash sound, and
+  sandpipers run back and forth along the water's edge.
+- Rocks and driftwood are drawn from a per-object seed (`srand`), so each one
+  has its own lumpy outline, light/dark faces, speckles, cracks, barnacles
+  and seaweed (rocks), or taper, broken end, grain, knots and rings (logs).
+  No two are the same. Each rock's walkable top stays at its collision height.
+- **Solid obstacles** (new to the engine, `areaSolids()`): rocks, single
+  driftwood logs and driftwood piles. The animal can stand on top but can't
+  walk through them, so it has to jump on or over them.
+- **Tidepools** (`areaPools()`) with starfish and colorful anemones: landing
+  or walking into one splashes and bounces the animal back out to the edge
+  it came from. Arrows are ignored during the bounce.
+- Creatures: red crabs (scuttle like the beetles) and teal sand hoppers (quick
+  little hops). Teal rather than sand-colored so they stand out.
+- 5 seashells, each a different over-the-top classic shape and color: pink
+  scallop, orange conch, purple spiral, spotted yellow cowrie, blue auger.
+  They sit on top of rocks and driftwood piles (`B.shells`). The counter shows
+  a scallop. Shell 4 is on a rock along the cliff past the near cave door;
+  shell 5 is left of the far door, so he has to go left out of the cave. The
+  far door is far enough from the cliff jut that shell 5 starts off screen
+  on every screen size tested (phone, iPad, PC, ultra-wide).
+- **Sea cave**: halfway along, a cliff rises behind the beach with the cave
+  door in it. The animal can walk past the door, and the screen scrolls along
+  more cliff until the cliff juts out to the sea and fills the screen from the
+  right edge (it can't go further; the camera stops there, `B.cliff`). The far
+  side mirrors it. ▲ at the door goes into a sea cave: rock steps up to a high ledge with the
+  key, then a tidepool and more rocks, then the far opening. ▲ there comes out
+  on the other side of the cliff. Each end of the cave goes back out its own
+  side. Cliff faces lean back slightly as they rise. Only the animal's side
+  of the cliff is ever drawn, and nothing from the other side shows.
+- Driftwood (`drawDriftwood`) is shaped like real driftwood: bowed, wavy and
+  tapering, with root balls or splintered ends, branch stubs, grain and
+  knots, in a weathered grey-brown with a dark outline and a shadow so it
+  stands out from the sand. Single pieces lie on the sand; piles
+  (`drawPile`) are rough pyramids with pieces leaning in from the sides.
+  A pile collides as two steps (`expandSolids`): a lower step across its
+  full width and a higher one in the middle.
+- Evergreens (`fir`) have a brown trunk, ragged drooping tiers, outlines, a
+  sunlit side and needle strokes, each slightly different.
+- The beach level is longer than the forest (`LEVEL_W`/`GATE_X` are set per
+  level in `startLevel`).
+- All level 3 layout lives in the `B` object near the top of the script.
+
+### forest_friends level 4: Pacific Northwest beach at sunset (built 2026-11-01, not yet play-tested)
+
+Dillon's design, the night partner of level 3 (data in `BEACH4`; `B` points at
+the current beach):
+- Sky in a real sunset ombre (dusky top, light red, orange, gold at the
+  horizon) with pink clouds, stars coming out and a faint crescent moon. The
+  sun sets behind the mountains and lays a glittering path on the water. The
+  beach itself is dark, like dusk. (How: the world is drawn, darkened, then
+  the sky painted in behind it; `drawDuskSky`.)
+- Same sea cave inside, but the rocks, driftwood and tidepools are
+  rearranged, and the near stretch of cliff is longer.
+- Same crabs and sand hoppers, now with a soft blue-green bioluminescent glow
+  and glowing spots. Seagulls and sandpipers stay. The tidepools glow too:
+  drifting plankton, two little pulsing jellyfish and glowing anemone tips
+  (`poolGlow`).
+- Collect **sea glass** (aqua, green, cobalt, amber, lavender): frosted
+  pebbles glowing with magical light, with little lights blinking around them.
+- **Torch needed again** for the cave (dark door and thought bubble without
+  it, a circle of light inside). It stands on a rock past the near cave door,
+  out of view until he walks past the door.
+- In the background a pod of dolphins leaps now and then, with glowing
+  sparkles off their splashes. (Level 3 gets a humpback whale breaching far
+  out in the bay instead.)
+- `MAX_LEVEL` is 4, so level 4 now ends at the win screen.
+
+### forest_friends level 2: night forest (built 2026-11-01, not yet play-tested)
+
+Dillon's design: the forest at night, with its own layout (`TREES_2`,
+`PLATS_2`, `ENEMY_DEFS_2`, acorns at `ACORN_POS_2`; rearranged 2026-11-01 so it
+isn't a copy of level 1). The cave stays at `CAVE_X`.
+- Night sky with twinkling stars and a big, low, glowing harvest moon. Little
+  groups of bats flap across it every 5-10s. The faint background trees are
+  left out at night so the moon shows between the big trees.
+- Fireflies replace the butterflies, and the floating sparkles become tiny
+  distant fireflies. Branch tops and the grass edge get a pale moonlit
+  highlight so platforms stay easy to see. Colors are in `DAY`/`NIGHT`.
+- Ghosts replace the beetles (same paths): translucent white with a soft
+  glow, floating and bobbing a little above the ground, with a rippling hem.
+  The slimes are still lilac but have a faint neon glow and outline.
+- The 5 acorns are the same.
+- **Torch**: it stands on the top branch of the tree before the cave
+  (`TORCH_POS`). Without it the cave mouth is pitch black and can't be
+  entered: walking up to it gives a "torch" thought bubble and the HUD's
+  torch slot pulses. With the torch, the animal carries it (with rising
+  embers) and the cave mouth glows. Inside the cave everything is dark except
+  a steady (non-flickering) circle of warm light around the torch, covering
+  a bit over a quarter of the screen (1.25× the quarter-screen size, same in
+  the sunset sea cave) (`drawTorchDark`, Dillon's call after trying
+  an evenly lit cave). The torch flame is several tongues
+  rising and falling at their own pace. The cave's way out shows the night sky and moon.
 - Touch controls: a ▲▼◀▶ cross on the left, and the jump button on the right
   (drawn as a gold star so it doesn't look like ▲). The whole left half of
-  the screen picks the cross direction nearest the finger, and the right half
-  is jump. PC keyboard: arrows / WASD, and **space to jump** (up no longer
-  jumps; it's the portal key).
+  the screen picks the cross direction nearest the finger. **Only the star
+  jumps** (within 1.3× its radius, changed 2026-11-01 at Dillon's request).
+  Other taps on the right just make a small sparkle.
+- PC: arrows or WASD move (W/up is the portal key), and **space or a mouse
+  click jumps** (holding the click glides like holding space).
 - Game controller (Xbox etc., via the browser's Gamepad API): left stick or
   D-pad moves, up/down for portals and drop-through, and A/B/X/Y all jump. A
   also presses Play, picks the highlighted animal card and presses the
@@ -78,9 +200,20 @@ and Ori-style vertical movement).
   drop-through and all 5 acorns) reach the win screen at phone-landscape,
   phone-portrait and PC sizes.
 
+## Planned (Dillon, 2026-11-01)
+
+- **Difficulty select** (easy / medium / hard) before choosing an animal.
+  Harder difficulties get more enemies, enemies that can actually hurt the
+  animal (health), and food that restores some health. Each level's
+  enemies are already a plain list
+  (`ENEMY_DEFS`, `ENEMY_DEFS_2`, `B.enemies`), so harder ones can add extra
+  entries per level.
+
 ## Next steps
 
-1. Play-test on the Fire tablet and PC if not done yet. Tune speed, jump
+1. Play-test levels 2-4, the level picker and the star-only jump on the
+   iPhone.
+2. Play-test on the Fire tablet and PC if not done yet. Tune speed, jump
    height, button size and difficulty from how he actually plays.
-2. When changing a game, bump `CACHE` in its `sw.js` so the installed iPhone
+3. When changing a game, bump `CACHE` in its `sw.js` so the installed iPhone
    copy picks up the new version (open it once while online).
